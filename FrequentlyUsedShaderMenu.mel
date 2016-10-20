@@ -17,12 +17,57 @@ Updated by: Kirill Kovalevskiy (kovalewskiy@gmail.com)
 */
 
 
-
-
 /**
  * Create a new parent group for selected objects
  */
- 
+global proc groupGrouperOrigin(){
+	int $place = `radioButtonGrp -q -sl "objectOrOrigin"`;
+	string $sel[] = `ls -sl`;
+	string $buffer[];
+	string $newSelection[];
+	print($place);
+	if (size($sel)>0){
+		
+		for ($stuff in $sel){
+			//gmatches to get the count on nulls
+			int $count;
+			string $par[] = `listRelatives -c $stuff`;
+			if  (`gmatch  $stuff ("*" + "_null_" + "*") `){
+				$count = $count + 1;
+			} //end if
+			for ($each in $par){
+				if (`gmatch  $each ("*" + "_null_" + "*") `) {
+					$count = $count + 1;
+				}//end if
+			} //end for
+			string $newBuffer = `tokenize $stuff "_" $buffer`;
+			string $reconstructString;
+			if ($count>0){
+				for($i = 0; $i < size($buffer); $i++){
+					$reconstructString = $reconstructString + $buffer[$i] + "_";
+					if (`gmatch $buffer[$i] "null"`){
+						$reconstructString = $reconstructString + $count;
+						$i = $i + 1;
+					}//end if
+				}//end for
+				string $groupObject = `group -n $reconstructString $stuff`;
+				string $groupTemp = `group -em -n "a_girl_has_a_name"`;
+				string $tempPar[] = `parentConstraint  $groupObject $groupTemp`;
+				delete $tempPar[0];
+				$newSelection[size($newSelection)] = $groupObject;
+			} //end if
+			else{
+				string $groupObject02 = `group -n ($stuff + "_null_0") $stuff`;
+				string $groupTemp02 = `group -em -n "a_girl_has_a_name"`;
+				string $tempPar02[] = `parentConstraint  $groupObject02 $groupTemp02`;
+				delete $tempPar02[0];
+				$newSelection[size($newSelection)] = $groupObject02;
+			}
+		}//end for
+
+	} // end if
+	select -r $newSelection;
+} // end proc
 
 global proc doGroupForOffset()
 {
