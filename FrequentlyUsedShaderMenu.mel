@@ -27,44 +27,46 @@ global proc groupGrouperOrigin(){
 	string $newSelection[];
 	print($place);
 	if (size($sel)>0){
-		
 		for ($stuff in $sel){
 			//gmatches to get the count on nulls
-			int $count;
-			string $par[] = `listRelatives -c $stuff`;
-			if  (`gmatch  $stuff ("*" + "_null_" + "*") `){
-				$count = $count + 1;
-			} //end if
-			for ($each in $par){
-				if (`gmatch  $each ("*" + "_null_" + "*") `) {
-					$count = $count + 1;
-				}//end if
-			} //end for
+			    	// keep original parent names
+	    	string $parentNames[] = stringToStringArray(firstParentOf($stuff), "|");
+	    	int $countParents = size($parentNames);
+	    	
+					int $count;
+		
+			//rebuilds group name using "nulls" suffix if there is any
 			string $newBuffer = `tokenize $stuff "_" $buffer`;
 			string $reconstructString;
-			if ($count>0){
+			
+			//increment "null" suffix number on string
+			if  (`gmatch  $stuff ("*" + "_null_" + "*") `){
 				for($i = 0; $i < size($buffer); $i++){
 					$reconstructString = $reconstructString + $buffer[$i] + "_";
 					if (`gmatch $buffer[$i] "null"`){
+						$count = int($buffer[$i + 1]);
+						$count = $count + 1;
 						$reconstructString = $reconstructString + $count;
 						$i = $i + 1;
 					}//end if
 				}//end for
-				string $groupObject = `group -n $reconstructString $stuff`;
-				string $groupTemp = `group -em -n "a_girl_has_a_name"`;
-				string $tempPar[] = `parentConstraint  $groupObject $groupTemp`;
-				delete $tempPar[0];
-				$newSelection[size($newSelection)] = $groupObject;
-			} //end if
-			else{
-				string $groupObject02 = `group -n ($stuff + "_null_0") $stuff`;
-				string $groupTemp02 = `group -em -n "a_girl_has_a_name"`;
-				string $tempPar02[] = `parentConstraint  $groupObject02 $groupTemp02`;
-				delete $tempPar02[0];
-				$newSelection[size($newSelection)] = $groupObject02;
 			}
+			//if no "null" suffix give it one
+			else{
+				$reconstructString = $stuff + "_null_0";
+			}
+			
+			string $groupObject = `group -w -n $reconstructString $stuff`;
+			xform -ws -a -rp 0 0 0 $groupObject;
+			
+			if ($countParents)
+	    	{
+	      		string $originalParent = $parentNames[$countParents - 1];
+	      		parent $groupObject $originalParent;
+	    	}
+	    	
+			$newSelection[size($newSelection)] = $groupObject;
 		}//end for
-
 	} // end if
 	select -r $newSelection;
 } // end proc
@@ -160,7 +162,7 @@ global proc createGroupGrouper()
 		doGroupForOffset();
 	}
 	else{
-		print("Under Construction.");
+		groupGrouperOrigin();
 	}
 }
 
@@ -835,3 +837,4 @@ global proc fuShaderWindow(){
 
 }
 
+fuShaderWindow()
