@@ -1,0 +1,25 @@
+/*
+
+Attaches Locator to surface Using another locator for position
+
+*/
+
+//locator for position on surface
+string $loc[] = `listRelatives -p "temp_jnt_*_ctrl_Shape1"`;
+//locator on surface
+string $objectLoc[] = `listRelatives -p "objectLoc_Shape*"`;
+//surface node for position
+string $latticeSurface[]= `ls latticeSurface`;
+//surface shape for position on surface
+string $latticeSurfaceShape[]= `ls latticeSurfaceShape`;
+for ($n =0; $n <= size($objectLoc); $n++){
+	string $closestPoint = `createNode closestPointOnMesh`;
+	string $decomposeM = `createNode decomposeMatrix`;
+
+	connectAttr -f ($latticeSurface[0]+".worldMatrix[0]")($closestPoint+".inputMatrix");
+	connectAttr -f ($latticeSurfaceShape[0]+".inMesh")($closestPoint+".inMesh");
+	connectAttr -f ($loc[$n]+".worldMatrix[0]")($decomposeM+".inputMatrix");
+	connectAttr -f ($decomposeM+".outputTranslate")($closestPoint+".inPosition");
+	//closestPointOnMesh2.result.position
+	connectAttr -f ($closestPoint+".result.position")($objectLoc[$n]+".translate");
+}
