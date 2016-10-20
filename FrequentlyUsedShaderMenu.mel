@@ -151,7 +151,11 @@ global proc doGroupForOffset()
 }
 
 global proc unGroupGrouper(){
-	print("I do nothing.");
+	string $sel[] = `ls -sl`;
+	for ($each in $sel){
+		ungroup $each;
+	}
+	
 }
 
 global proc createGroupGrouper()
@@ -836,5 +840,3 @@ global proc fuShaderWindow(){
     showWindow shaderWindowUI;
 
 }
-
-fuShaderWindow()
