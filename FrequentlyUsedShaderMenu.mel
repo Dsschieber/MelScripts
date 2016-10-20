@@ -1,0 +1,792 @@
+/*
+----------------------------------------------------------------------------------------
+Author: Doug Schieber 
+Email: DougSchieberAnimation@gmail.com
+Last Updated: October 20, 2016
+Version 1.0.0
+
+
+Script Name: sceneCustomHUD
+System Date Functions Authors: 
+Authors: Alexey.Borzukh aka NURB & Pavel.Antonenkov
+Updated by: Kirill Kovalevskiy (kovalewskiy@gmail.com)
+
+
+
+----------------------------------------------------------------------------------------
+*/
+
+
+
+
+/**
+ * Create a new parent group for selected objects
+ */
+ 
+
+global proc doGroupForOffset()
+{
+  	// get inputed suffix
+  	int $place = `radioButtonGrp -q -sl "objectOrOrigin"`;
+	string $suffix;
+	string $buffer[];
+	string $newSelection[];
+	
+  	// get selected objects
+	string $objects[] = `ls -sl`;
+	for ($object in $objects)
+	{
+    	// keep original parent names
+    	string $parentNames[] = stringToStringArray(firstParentOf($object), "|");
+    	int $countParents = size($parentNames);
+	
+		//get the count of nulls
+		int $count;
+		
+		//rebuilds group name using "nulls" suffix if there is any
+		string $newBuffer = `tokenize $object "_" $buffer`;
+		string $reconstructString;
+		
+		//increment "null" suffix number on string
+		if  (`gmatch  $object ("*" + "_null_" + "*") `){
+			for($i = 0; $i < size($buffer); $i++){
+				$reconstructString = $reconstructString + $buffer[$i] + "_";
+				if (`gmatch $buffer[$i] "null"`){
+					$count = int($buffer[$i + 1]);
+					$count = $count + 1;
+					$reconstructString = $reconstructString + $count;
+					$i = $i + 1;
+				}//end if
+			}//end for
+		}
+		//if no "null" suffix give it one
+		else{
+			$reconstructString = $object + "_null_0";
+		}
+	
+    	// create empty group
+    	string $groupName = $reconstructString;
+    	string $group = `group -em -name $groupName`;
+    	xform -os -piv 0 0 0 $group;
+
+    	// move the group under the object
+    	parent $groupName $object;
+
+    	// initilize group attributes
+    	setAttr ($groupName + ".tx") 0.0;
+    	setAttr ($groupName + ".ty") 0.0;
+    	setAttr ($groupName + ".tz") 0.0;
+    	setAttr ($groupName + ".rx") 0.0;
+    	setAttr ($groupName + ".ry") 0.0;
+    	setAttr ($groupName + ".rz") 0.0;
+    	setAttr ($groupName + ".sx") 1.0;
+    	setAttr ($groupName + ".sy") 1.0;
+    	setAttr ($groupName + ".sz") 1.0;
+
+    	// unparent group
+    	// At this point, the group should have the same offset values as the object
+    	parent -world $groupName;
+
+    	// move the object under the group
+    	parent $object $groupName;
+
+    	// move back to the original parent node if exists
+    	if ($countParents)
+    	{
+      		string $originalParent = $parentNames[$countParents - 1];
+      		parent $groupName $originalParent;
+    	}
+		// for selecting new groups
+    	$newSelection[size($newSelection)] = $groupName;
+	}
+	
+	select -r $newSelection;
+}
+
+global proc unGroupGrouper(){
+	print("I do nothing.");
+}
+
+global proc createGroupGrouper()
+{
+  	// get inputed suffix
+  	int $place = `radioButtonGrp -q -sl "objectOrOrigin"`;
+	if ($place == 1){
+		doGroupForOffset();
+	}
+	else{
+		print("Under Construction.");
+	}
+}
+
+/*
+Functions System Date on HUD
+*/
+
+global proc string sysDate(){
+	 string $cmd = "date /t";
+	 string $time = `system $cmd`;
+	 int $dateLen = size($time);
+	 int $dateStart = $dateLen -12;
+	 $time = `substring $time $dateStart $dateLen`;
+	 return $time;
+}
+
+global proc dateDisplay()
+{
+	headsUpDisplay
+		-section 5
+		-block 1
+		-blockSize "small"
+		-labelFontSize "small"
+		-dataFontSize "small"
+		-label "date"
+		-command "sysDate"
+		-event "cameraChange"
+	dateHUD;
+}
+
+global proc removeDateDisplay()
+{
+headsUpDisplay -rem dateHUD;
+}
+
+/*
+Function For Creating a Different Kind of Rivet
+*/
+
+global proc createRivet(){
+	//select two edges
+	string $doubleEdgeSelection[] = `ls -sl`;
+	
+	if (size($doubleEdgeSelection) == 2){
+		
+		//create two curves from them
+		string $polyCurve01[] = `polyToCurve -n ($doubleEdgeSelection[0]) -f 2 -degree 1 $doubleEdgeSelection[0]`;
+		string $polyCurve02[] = `polyToCurve -n ($doubleEdgeSelection[1]) -f 2 -degree 1 $doubleEdgeSelection[1]`;
+		
+		//loft a nurbsSurface between them
+		string $loftedSurface[] = `loft -n "loftedSurface_G0" -ch 1 -u 1 -c 0 -ar 1 -d 3 -ss 1 -rn 0 -po 0 -rsn true $polyCurve01[0] $polyCurve02[0]`;
+		
+		//store surface into memory
+		string $np[] = `ls $loftedSurface[0]`;
+		
+		//make and connect a pointOnSurtfaceInfo node
+		string $posi = `createNode pointOnSurfaceInfo`;
+		connectAttr ($np[0] + ".worldSpace[0]") ($posi + ".inputSurface");
+		//add a reader group and give it attr for controlling the read point of the posi node,
+		//make the local axis visible and make it grabbable
+		string $readr = `group -em -n "reader"`;
+		addAttr -ln "posU" -dv .5 -min 0 -max 1 -at "double" $readr;
+		setAttr -e-keyable true ($readr + ".posU");
+		addAttr -ln "posV" -dv .5 -min 0 -max 1 -at double $readr;
+		setAttr -e-keyable true ($readr + ".posV");
+		setAttr ($readr + ".displayHandle") 1;
+		setAttr ($readr +".displayLocalAxis") 1;
+		//make the aim constraint for conversion of the output vectors of the posi node to euler rotations
+		string $aim = `createNode aimConstraint`;
+		//drive the reader's translation
+		connectAttr ($posi + ".position") ($readr + ".t") ;
+		//hook up the UV driver attrs to the posi node
+		connectAttr ($readr + ".posU" ) ($posi + ".parameterU" );
+		connectAttr ($readr + ".posV" ) ($posi + ".parameterV" );
+		//connect aim constrain as specified
+		connectAttr ($posi + ".tangentU") ($aim + ".target[0].targetTranslate") ;
+		connectAttr ($posi + ".tangentV") ($aim + ".worldUpVector") ;
+		connectAttr ($aim + ".constraintRotate" ) ($readr + ".r" );
+		
+		string $groupObject = `group -r -n "rivetMechanics_grp_0" $polyCurve01[0] $polyCurve02[0] $loftedSurface[0] $aim`;
+		setAttr ($groupObject + ".visibility") 0;
+		select -r $readr;
+		
+	}
+	
+	else{
+		confirmDialog -title "Confirm" -message "Only two edges can be selected. " -messageAlign "left" -icon "information";
+	}
+}
+
+/*
+Function for Hunting Down any Object in the Scene with control Suffix.
+
+-checks for namespaces
+-checks for controller Suffix
+-checks for "if" nurbsCurve
+-selects based on "if" nurbs Curve or controller suffix
+
+*/
+global proc controlHunter(){
+	select -cl ;
+	//string $allCtrl[] = `ls "*ctrl*"`;
+	string $nurbCurves[] = `ls -type "nurbsCurve"`;
+	string $buffer[] ; // Create Empty Array To Hold Tokens
+	
+	
+	//getting around namespaces by getting shapeNodes in a scene
+	for ($i = 0; $i < size($nurbCurves); $i++){
+		if(`gmatch  $nurbCurves[$i] ("*" + ":" + "*") `){
+			tokenize $nurbCurves[$i] ":" $buffer ; // Split $objectName by ":"
+			string $namespace = $buffer[0] ; // "namespace"
+			string $object = $buffer[1] ; // "character"
+			
+			tolower $object;
+			//print($object + "\n");
+			if (`gmatch  $object ("*" + "ctrl" + "*") `) {
+					select -add $nurbCurves[$i];
+			}
+		}
+	} //end for	
+	string $nodeSelection[] = `ls -sl`;
+	
+	if (size($nodeSelection) > 0){
+		pickWalk -d up;
+	}
+	//adds any ctrl that doesn't have a namespace
+	
+	select -add (listRelatives("-parent",listRelatives("-shapes","-type","nurbsCurve",`ls -tr"*ctrl*"`)));
+	select -add (listRelatives("-parent",listRelatives("-shapes","-type","nurbsCurve",`ls -tr"*Ctrl*"`)));
+	select -add (listRelatives("-parent",listRelatives("-shapes","-type","nurbsCurve",`ls -tr"*CTRL*"`)));
+	select -add (listRelatives("-parent",listRelatives("-shapes","-type","nurbsCurve",`ls -tr"*ctl*"`)));
+	select -add (listRelatives("-parent",listRelatives("-shapes","-type","nurbsCurve",`ls -tr"*Ctl*"`)));
+	
+} // end proc
+
+/*
+FBX importer Function
+-queries folder
+-checks file type (".mb" or .fbx)
+-builds Resource Library based on Search || whatever is in folder
+*/
+
+//fbx search query window
+global proc textFieldQuery(){
+	string $search = `textFieldGrp -q -tx "searchTextField"`;
+	
+	deleteUI -layout ghostFBXFrameLayout;
+	
+	frameLayout -w 370 -mh 10 -mw 10 -p "FBXimport" -label " Resource Library " -collapsable false -collapse false ghostFBXFrameLayout;
+	
+	scrollLayout
+    	-parent "ghostFBXFrameLayout"
+		-horizontalScrollBarThickness 30
+	 	-verticalScrollBarThickness   30
+	 	-height 500
+	 	-bgc .3 .3 .3
+	 	ghostLibraryScrollLayout;
+	
+	string $fbx_folder =		(`about -mac` ? "/Volumes/Projects/GhostProductions" : "M:") + "/Resources/FBX/";
+	if(`filetest -d $fbx_folder`){
+		for($file in `getFileList -fld $fbx_folder -fs "*.fbx"`){
+			string $array[];
+		    $array = stringToStringArray($file, ".");
+			if ($search == ""){
+		    	button -bgc .5 .5 .5 -label $file -c ("file -import -mergeNamespacesOnClash true \""+$fbx_folder+$file+"\"");
+		    } //end if
+		    else{
+		    	if(`gmatch  $array[0] ("*" + $search + "*") `){
+					button -bgc .2 .2 .5 -label $file -c ("file -import -mergeNamespacesOnClash true \""+$fbx_folder+$file+"\"");
+		    	}
+	    	} // end else
+	    } //end for
+		for($file in `getFileList -fld $fbx_folder -fs "*.mb"`){
+			string $array[];
+		    $array = stringToStringArray($file, ".");
+			if ($search == ""){
+		    	button -bgc .5 .5 .5 -label $file -c ("file -import -mergeNamespacesOnClash true \""+$fbx_folder+$file+"\"");
+		    } //end if
+		    else{
+		    	if(`gmatch  $array[0] ("*" + $search + "*") `){
+					button -bgc .2 .2 .5 -label $file -c ("file -import -mergeNamespacesOnClash true \""+$fbx_folder+$file+"\"");
+		    	}
+	    	} // end else
+	    } //end for
+	} //end if
+} //end proc
+
+/*
+Vertex Align Tool For Model Tab
+*/
+
+proc makeObj() {
+     if (`radioButtonGrp -q -select myRadBtnGrp` == 1) vertAlignX();
+     if (`radioButtonGrp -q -select myRadBtnGrp` == 2) vertAlignZ();
+     if (`radioButtonGrp -q -select myRadBtnGrp` == 3) vertAlignY();
+     if (`radioButtonGrp -q -select radBtnGrp2` == 1) selfAlignX();
+     if (`radioButtonGrp -q -select radBtnGrp2` == 2) selfAlignY();
+     if (`radioButtonGrp -q -select radBtnGrp2` == 3) selfAlignZ(); 
+}
+proc vertAlignX()
+{
+	string $all_verts[] = `ls -sl -fl`;
+	for($i=0; $i<`size$all_verts`; $i++)
+	{
+		float $vert_position[] = `pointPosition $all_verts[$i]`;
+		move -ws -a 0 $vert_position[1] $vert_position[2]  $all_verts[$i];
+	}
+}
+
+proc vertAlignZ()
+{
+	string $all_verts[] = `ls -sl -fl`;
+	for($i=0; $i<`size$all_verts`; $i++)
+	{
+		float $vert_position[] = `pointPosition $all_verts[$i]`;
+		move -ws -a $vert_position[0] $vert_position[1] 0  $all_verts[$i];
+	}
+}
+
+proc vertAlignY()
+{
+	string $all_verts[] = `ls -sl -fl`;
+	for($i=0; $i<`size$all_verts`; $i++)
+	{
+		float $vert_position[] = `pointPosition $all_verts[$i]`;
+		move -ws -a $vert_position[0] 0 $vert_position[2]  $all_verts[$i];
+	}
+}
+
+proc selfAlignX()
+{
+	string $all_verts[] = `ls -sl -fl`;
+	for($i=0; $i<`size$all_verts`; $i++)
+	{
+		float $vert_position[] = `pointPosition $all_verts[$i]`;
+		float $new_position[] = `pointPosition $all_verts[0]`;
+		move -ws -a $new_position[0] $vert_position[1] $vert_position[2]  $all_verts[$i];
+	}
+}
+
+proc selfAlignY()
+{
+	string $all_verts[] = `ls -sl -fl`;
+	for($i=0; $i<`size$all_verts`; $i++)
+	{
+		float $vert_position[] = `pointPosition $all_verts[$i]`;
+		float $new_position[] = `pointPosition $all_verts[0]`;
+		move -ws -a  $vert_position[0] $new_position[1] $vert_position[2]  $all_verts[$i];
+	}
+}
+proc selfAlignZ()
+{
+	string $all_verts[] = `ls -sl -fl`;
+	for($i=0; $i<`size$all_verts`; $i++)
+	{
+		float $vert_position[] = `pointPosition $all_verts[$i]`;
+		float $new_position[] = `pointPosition $all_verts[0]`;
+		move -ws -a  $vert_position[0] $vert_position[1] $new_position[2] $all_verts[$i];
+	}
+}
+
+/*
+global proc queryRenderLayers(){
+
+    string $userRenderLayers[];
+    int $a;
+    //weeds out the master layer
+    for ($layer in $renderLayers){
+        if ($layer!="defaultRenderLayer"){
+            $userRenderLayers[$a++] = $layer;
+        
+}
+*/
+
+/*
+Create Render Layer For Rendering Tab Group
+
+From Object Selection
+-Empty Render Layer
+-Ambient Occlusion Layer 
+
+*/
+
+
+global proc queryInput(string $ctrl)
+{
+    global string $inputName;
+    $inputName = `textFieldGrp -q -text $ctrl`;
+    createRenderLayer -n ($inputName) -number 1  -nr `ls -selection`;
+    
+}
+
+global proc ao_pass (string $ctrl){
+	global string $ao_input;
+	print($ctrl);
+	$ao_input = `textFieldGrp -q -text $ctrl`;
+	print($ao_input);
+	string $selectionList[] = `ls -selection`;
+	string $rl = `createRenderLayer -n ($ao_input) -number 1 -nr $selectionList`;
+	print ($rl);
+	
+	int $num_samples = 128;
+    float $spread = 0.8;
+    int $max_distance = 0;
+    
+    string $surf_shader = `shadingNode -asShader  -name("amb_occl_surf_shader_" + $ao_input) surfaceShader`;
+    string $ao_shader = `shadingNode -asShader -name("amb_occl_" + $ao_input) mib_amb_occlusion`;
+    connectAttr -f ($ao_shader + ".outValue") ($surf_shader + ".outColor");
+	hookShaderOverride ($rl, "", $surf_shader);
+	//connectAttr -f ($surf_shader + ".outColor")($sg + ".surfaceShader");
+}
+
+    
+/*
+Import Shader Functions
+*/   
+
+global proc importMetal(){
+    string $soMetal = `file -import -type "mayaBinary" -gn "metal"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "metal" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/metal.mb"`;
+}
+global proc importFat(){
+    string $soFat = `file -import -type "mayaBinary" -gn "fat"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "fat" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/fat.mb"`;
+}
+
+global proc importMetal02(){
+    string $soMetal02 = `file -import -type "mayaBinary" -gn "metal02"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "metal02" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/metal02.mb"`;
+}
+
+global proc importPeek(){
+    string $soPeek = `file -import -type "mayaBinary" -gn "peek"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "peek" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/peek.mb"`;
+}
+
+global proc importSkin(){
+    string $soSkin = `file -import -type "mayaBinary" -gn "skin"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "skin" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/skin.mb"`;
+}
+
+global proc importVein(){
+    string $soSkin = `file -import -type "mayaBinary" -gn "vein"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "vein" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/vein.mb"`;
+}
+
+global proc importPlastic(){
+    string $soSkin = `file -import -type "mayaBinary" -gn "plastic"  -ignoreVersion -ra true -mergeNamespacesOnClash false -namespace "vein" -options "v=0;"  -pr "N:/Aaron/Frequently Used/shaders/White_Plastic.mb"`;
+}
+
+/*
+
+Quick Selection Functions
+
+*/
+global proc selectAllPolygons(){
+    string $transforms[] = `ls -tr`; //lists all the transform nodes in the scene
+    string $polyMeshes[] = `filterExpand -sm 12 $transforms`; //filters out all the non-polymesh nodes
+    select -r $polyMeshes; //selects all the polymeshes
+}
+
+global proc selectAllLights(){
+    string $allLight[] = `ls -type "light"`;
+    string $lightParent[] = `listRelatives -p ($allLight)`;
+    select $lightParent;
+}
+
+/*
+Matte Shader Assignments
+*/
+
+global proc cMH_assignColor(string $color)
+{
+	string $sels[] =				`ls -sl`;
+	string $shader =				("colorMatte_"+$color);
+	if(!`objExists $shader`)
+	{
+		string $material =				`shadingNode -asShader "surfaceShader" -name $shader`;
+
+		string $sg =					`sets -renderable true -empty -noSurfaceShader true -name ($material + "SG")`;
+		defaultNavigation -connectToExisting -source $material -destination $sg;
+//		string $name =		`hyperShadePanelCreate "shader" surfaceShader`;
+//		$name =			`rename $name $shader`;
+		switch($color)
+		{
+			case "red":
+				setAttr ($shader+".outColor") -type double3 1 0 0 ;
+			break;
+			case "green":
+				setAttr ($shader+".outColor") -type double3 0 1 0 ;
+			break;
+			case "blue":
+				setAttr ($shader+".outColor") -type double3 0 0 1;
+			break;
+			case "black":
+				setAttr ($shader+".outColor") -type double3 0 0 0;
+				setAttr ($shader+".outMatteOpacity") -type double3 0 0 0;
+			break;
+			case "magenta":
+				setAttr ($shader+".outColor") -type double3 1 0 1;
+			break;
+			case "cyan":
+				setAttr ($shader+".outColor") -type double3 0 1 1;
+			break;
+			case "yellow":
+				setAttr ($shader+".outColor") -type double3 1 1 0;
+			break;
+		}
+	} else
+	{
+		if(! `objectType -isType "surfaceShader" $shader`)
+		{
+			select $shader;
+			error($shader+" is not a surfaceShader.");
+		}
+	}
+	select -r $sels;
+	hyperShade -assign $shader ;
+}
+/*
+Construction of List Items Scroll List
+*/
+
+global proc addsel() 
+{
+    string $listSel[] = `ls -sl`;
+    string $currentTextSelection[] = `textScrollList -q -ai myScroll`;
+    for ($i = 0; $i < size($listSel); $i++){
+		for ($currentText in $currentTextSelection){
+			if ($currentText == $listSel[$i]){
+				textScrollList -e -ri $currentText myScroll;
+			}
+		}
+	}
+    for ($selection in $listSel)
+        textScrollList -e -append $selection myScroll;
+}
+
+global proc isolateSel() 
+{
+    string $listSel[] = `ls -sl`;
+    string $currentTextSelection[] = `textScrollList -q -ai myScroll`;
+    
+	textScrollList -e -ra myScroll;
+	
+    for ($selection in $listSel)
+        textScrollList -e -append $selection myScroll;
+}
+
+global proc doSelection()
+{
+    string $items[] = `textScrollList -q -si myScroll`;
+    select -r $items;
+}
+    
+//Procedure to remove selected elements from a textScrollList.
+global proc dwRemoveObjectsFromList ()
+{
+    string $currentTextSelection[] = `textScrollList -q -si myScroll`;
+    if (size($currentTextSelection) == 0)
+        error "Nothing selected in text list.";
+        for ($currentText in $currentTextSelection)
+            {
+            textScrollList -e -ri $currentText myScroll;
+            }
+
+}
+
+/*
+Main GUI Window
+*/
+
+global proc fuShaderWindow(){
+
+    if (`window -exists shaderWindowUI`)
+        {
+        deleteUI shaderWindowUI;
+        }
+    window  -title "FU Shader Menu" -maximizeButton on -sizeable on shaderWindowUI;
+    
+    //string $menuBarLayout = `menuBarLayout`;
+    //	menu -label "Display" -tearOff true;
+    //		menuItem  -cb on -label "Date and Time" timeAndDateMenuItem;
+    //		separator;
+    
+    string $adjustmentColumn = `rowColumnLayout -p "shaderWindowUI" 
+    							-numberOfRows  1
+    							adjustmentColumn01`;
+    
+    string $mainRowLayout2 = `rowColumnLayout -p "adjustmentColumn01"
+    							-numberOfColumns 1
+    							mainLayout02
+    							`;
+    
+    string $mainRowLayout = `rowColumnLayout -p "adjustmentColumn01" 
+    							-numberOfColumns  2
+                                mainLayout
+                                `;
+
+    //FAST SELECTIONS
+    frameLayout -w 250 -mh 10 -mw 10 -p "mainLayout02" -label " List Items " -collapsable false -collapse false textScrollLayout;
+        columnLayout -adj 1 -p "textScrollLayout";
+            textScrollList -allowMultiSelection true -h 500
+                -showIndexedItem 4
+                -selectCommand "doSelection"
+                myScroll; 
+            separator -h 20 -hr on -w 300;
+        button -l "Add objects to list" -c "addsel()";
+        button -l "Remove objects from list" -c "dwRemoveObjectsFromList ()";
+        button -l "Isolate objects by selection" -c "isolateSel()";
+        
+    // TAB LAYOUTS
+	string $tabs = `tabLayout -cr true  -innerMarginWidth 5 -innerMarginHeight 5 -p "mainLayout"`; 
+    string $tabChild1 = `rowColumnLayout  
+
+                      Rendering`;
+                      setParent..;
+
+    string $tabChild3 = `rowColumnLayout  
+
+                      Modeling`;
+                      setParent..;
+                      
+    string $tabChild2 = `rowColumnLayout  
+
+                      FBXimport`;
+                      setParent..;
+	string $tabChild3 = `rowColumnLayout
+						
+					  Animation`;
+                      setParent..;
+                      
+    string $child1 = `rowColumnLayout -p "Rendering"  -numberOfColumns 2         
+                      Shaders`;
+    string $child2 = `rowColumnLayout -p "Rendering"  -numberOfRows 2         
+                      Rendering`;
+    string $child3 = `rowColumnLayout  -p "Rendering"  -numberOfRows 1         
+                      helpLineLayout`;
+                      
+	string $childModeling1 = `rowColumnLayout -p "Modeling"  -numberOfColumns 2 
+							  topColAlign`;
+
+	string $childFBXimport = `rowColumnLayout -p "FBXimport"  -numberOfColumns 2 
+							  topColAlignFBXimport`;
+	
+	string $childAnimation = `rowColumnLayout -p "Animation"  -numberOfRows 2 
+						  	  topColAlignAnimation`;
+     
+    frameLayout -w 185 -mh 10 -mw 10 -p "Shaders" -label "Frequently Used Shaders " -collapsable false -collapse false oneFrameLayout;
+          button -c "importMetal" -p "oneFrameLayout" -label "ImportMetal" -w 50 oneBttn;
+          button -c "importFat" -p "oneFrameLayout" -label "ImportFat" -w 50 secondBttn;
+          button -c "importMetal02" -p "oneFrameLayout" -label "Import Metal02" -w 50 thirdBttn;
+          button -c "importPeek" -p "oneFrameLayout" -label "Import Peek" -w 50 fourthBttn;
+          button -c "importSkin" -p "oneFrameLayout" -label "Import Skin" -w 50 fifthBttn;
+          button -c "importVein" -p "oneFrameLayout" -label "Import Vein" -w 50 sixthBttn;
+          button -c "importPlastic" -p "oneFrameLayout" -label "Import Plastic" -w 50 seventhBttn;
+          
+    
+          
+    frameLayout -w 185 -mh 10 -mw 10 -p "Shaders" -label " Matte Shaders " -collapsable false -collapse false twoFrameLayout;
+			string $red_c =		`button -p "twoFrameLayout" -label "RED" -bgc 1 0 0 -c "cMH_assignColor \"red\""`;
+			string $green_c =	`button -p "twoFrameLayout" -label "GREEN" -bgc 0 1 0 -c "cMH_assignColor \"green\""`;
+			string $blue_c =	`button -p "twoFrameLayout" -label "BLUE" -bgc 0 0 1 -c "cMH_assignColor \"blue\""`;
+			string $black_c =	`button -p "twoFrameLayout" -label "BLACK" -bgc .1 .1 .1 -c "cMH_assignColor \"black\""`;
+			string $magenta_c =	`button -p "twoFrameLayout" -label "MAGENTA" -bgc 1 0 1 -c "cMH_assignColor \"magenta\""`;
+			string $cyan_c =	`button -p "twoFrameLayout" -label "CYAN" -bgc 0 1 1 -c "cMH_assignColor \"cyan\""`;
+			string $yellow_c =	`button -p "twoFrameLayout" -label "YELLOW" -bgc 1 1 0 -c "cMH_assignColor \"yellow\""`;
+			
+	
+	separator -st "shelf" -p "Rendering";
+	
+    string $renderingChild1 = `rowColumnLayout -p "Rendering"  -numberOfColumns 1         
+                      RenderingLayers`;
+    string $renderingChild2 = `rowColumnLayout -p "Rendering"  -numberOfColumns 2         
+                      RenderingFastSelections`;
+    
+    
+    frameLayout -mh 10 -mw 10 -p "RenderingLayers" -label "Render Layers " -collapsable false -collapse false renderingFrameLayout;
+        global string $ctrl;
+        $ctrl = `textFieldGrp -w 350 -adj 1 -cal 1 left -label "Name"`;
+        button -l "Create Render Layer" -c "queryInput ($ctrl)";
+        button -l "Create Ambient Occlusion" -c "ao_pass ($ctrl)";
+        
+    separator -st "shelf" -p "Rendering";
+
+    frameLayout -w 185 -mh 10 -mw 10 -p "RenderingFastSelections" -label " ghOst Cameras " -collapsable false -collapse false ghostCameraFrameLayout;
+        string $camera_folder =		(`about -mac` ? "/Volumes/Projects/GhostProductions" : "M:") + "/Resources/CameraSetups/";
+                if(`filetest -d $camera_folder`)
+                    for($file in `getFileList -fld $camera_folder -fs "*.mb"`)
+                        button -label $file -c ("file -import -mergeNamespacesOnClash true \""+$camera_folder+$file+"\"");
+    frameLayout -w 185 -mh 10 -mw 10 -p "RenderingFastSelections" -label " Extra " -collapsable false -collapse false fastSelectionLayout;
+        button -label "Select Polygons" -c "selectAllPolygons";
+        button -label "Select Lights" -c "selectAllLights";
+        button -label "Create Jas's Lights" -c "source Jas_lightSetup;Jas_lightSetup;";
+    
+
+	
+	
+	//START FBX TAB
+	
+    frameLayout  -w 370 -mh 10 -mw 10 -p "topColAlignFBXimport" -label " Search Library " -collapsable false -collapse false searchFrameLayout;
+
+		 	
+	string $searchFieldGrp = `textFieldGrp 
+							-parent "searchFrameLayout" 
+							-label "Search:" 
+							-cw2 45 160 
+							searchTextField`; 
+	
+	string $searchButton = `button 
+						-l "Search \nand Build Ghost_Library" 
+						-p "searchFrameLayout" 
+						-h 44 -w 109 
+						-c "textFieldQuery()"`;
+	
+	separator -st "shelf" -p "topColAlignFBXimport";
+	frameLayout -w 370 -mh 10 -mw 10 -p "topColAlignFBXimport" -label " Resource Library " -collapsable false -collapse false ghostFBXFrameLayout;
+    scrollLayout
+    	-parent "ghostFBXFrameLayout"
+		-horizontalScrollBarThickness 30
+	 	-verticalScrollBarThickness   30
+	 	-height 400
+	 	-bgc .3 .3 .3
+	 	ghostLibraryScrollLayout;
+
+	
+	
+	//START MODELING TAB
+	
+	frameLayout -p "topColAlign" -label "Align Vertex Menu" -collapsable false -collapse false -w 185  AlignVert;
+	frameLayout -p "topColAlign" -label "Group" -collapsable false -collapse false -w 185  grouperGroup;
+          
+	//string $emptyTest03 = `text -l "" -h 3 -p "grouperGroup"`;
+	string $radioGrpGrouper = `radioButtonGrp -sl 1 -w 100 -p "grouperGroup" -labelArray2 "Object" "Origin" -numberOfRadioButtons 2 objectOrOrigin`;
+	//string $emptyTest02 = `text -l "" -h 1 -p "grouperGroup"`;
+	string $grouperButton = `button -p "grouperGroup" -c "createGroupGrouper()" -label "Group" grouperButton`;
+	string $grouperButton = `button -p "grouperGroup" -c "unGroupGrouper()" -label "UnGroup" unGrouperButton`;
+	string $emptyTest01 = `text -l "" -h 10 -p "grouperGroup"`;
+	
+    //textScrollList -height  150 -ams on windowsTSL;
+    string $radioBttnForm = `formLayout -p "AlignVert" -numberOfDivisions 150`;
+    string $vertGroup1 = `radioButtonGrp 
+          -numberOfRadioButtons 3
+          -label "Select Type : " 
+          -labelArray3 "vertAlignX" "vertAlignY" "vertAlignZ"
+          -select 1
+          -vr
+          myRadBtnGrp`;
+     radioButtonGrp -numberOfRadioButtons 3 -shareCollection $vertGroup1
+    				-vr -label "" -labelArray3 "selfAlignX" "selfAlignY" "selfAlignZ" radBtnGrp2;
+     button -label "Align Vertex" -w 100 -command "makeObj()" myBtn1;
+     //button -label "Test Button" -w 100 myBtn2;
+    
+    formLayout -edit 
+         -attachForm myRadBtnGrp "top" 10
+         -attachForm myRadBtnGrp "left" -50
+         -attachForm radBtnGrp2 "top" 65
+         -attachForm radBtnGrp2 "left" -50
+         -attachForm myBtn1 "bottom" 10 
+         -attachForm myBtn1 "left" 50
+         -attachForm myBtn1 "top" 150
+        
+    $radioBttnForm;
+    
+    separator -st "shelf" -p "Modeling";
+    
+    //START ANIMATION TAB
+    frameLayout -w 370 -mh 10 -mw 10 -p "topColAlignAnimation" -label " Animation Quick Select " -collapsable false -collapse false quickSelectionAnimationFrameLayout;
+    
+    button -label "Find Controls" -c "controlHunter()";
+    button -label "Create Rivet" -c "createRivet()";
+    
+    frameLayout -w 185 -mh 10 -mw 10 -p "topColAlignAnimation" -label " Display Options " -collapsable false -collapse false displayOptionsFrameLayout;
+    
+	checkBox -label "Display Date" -ofc "removeDateDisplay()" -onc "dateDisplay()" -p "displayOptionsFrameLayout";
+	
+    showWindow shaderWindowUI;
+
+}
+
