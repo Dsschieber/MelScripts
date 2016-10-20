@@ -15,3 +15,10 @@ Comes with:
 
 If you're using this Tool Menu you will have to replace the directory strings for the FBX importer, cameras, and Frequently Used Shaders.
 Everything else should work properly. 
+
+To Use Fequently Used Shader Menu, put this script into your shelf:
+
+source "Your Directory Here";
+fuShaderWindow;
+
+Added Locator To Surface Script. 
