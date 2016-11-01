@@ -10,16 +10,34 @@ Script Name: sceneCustomHUD
 System Date Functions Authors: 
 Authors: Alexey.Borzukh aka NURB & Pavel.Antonenkov
 Updated by: Kirill Kovalevskiy (kovalewskiy@gmail.com)
-
+wrote the display date function
 
 
 ----------------------------------------------------------------------------------------
 */
 
+//renaming tools
+global proc searchAndDestroy(){
+	print("search and replaced");
+}
+
+global proc renameObjects(){
+	print("Not Enabled");
+}
+
+global proc addPrefix(){
+	print("Prefix Added");
+}
+
+global proc addSuffix(){
+	print("suffix Added");
+}
 
 /**
  * Create a new parent group for selected objects
  */
+ 
+ 
 global proc groupGrouperOrigin(){
 	int $place = `radioButtonGrp -q -sl "objectOrOrigin"`;
 	string $sel[] = `ls -sl`;
@@ -783,15 +801,30 @@ global proc fuShaderWindow(){
 		-horizontalScrollBarThickness 30
 	 	-verticalScrollBarThickness   30
 	 	-height 400
-	 	-bgc .3 .3 .3
+	 	-bgc .5 .5 .5
 	 	ghostLibraryScrollLayout;
 
 	
 	
 	//START MODELING TAB
 	
-	frameLayout -p "topColAlign" -label "Align Vertex Menu" -collapsable false -collapse false -w 185  AlignVert;
-	frameLayout -p "topColAlign" -label "Group" -collapsable false -collapse false -w 185  grouperGroup;
+	frameLayout -parent "topColAlign" -width 370 -mh 10 -mw 10 Utilities;
+	string $emptyTest02 = `text -l "" -h 10 -p "Modeling"`;
+	separator -st "shelf" -p "Modeling";
+	string $emptyTest03 = `text -l "" -h 10 -p "Modeling"`;
+	frameLayout -parent "Modeling" -width 370 -mh 10 -mw 10 RenamingTools;
+	
+	scrollLayout
+    	-parent "Utilities"
+		-horizontalScrollBarThickness 30
+	 	-verticalScrollBarThickness   30
+	 	-height 230
+	 	modelingScrollBar;
+	
+	
+	rowColumnLayout -numberOfRows 1 -p "modelingScrollBar" scrollModelingRowLayout01;
+	frameLayout -p "scrollModelingRowLayout01" -label "Align Vertex Menu" -collapsable false -collapse false -w 170  AlignVert;
+	frameLayout -p "scrollModelingRowLayout01" -label "Group Objects With Null" -collapsable false -collapse false -w 170  grouperGroup;
           
 	//string $emptyTest03 = `text -l "" -h 3 -p "grouperGroup"`;
 	string $radioGrpGrouper = `radioButtonGrp -sl 1 -w 100 -p "grouperGroup" -labelArray2 "Object" "Origin" -numberOfRadioButtons 2 objectOrOrigin`;
@@ -810,7 +843,7 @@ global proc fuShaderWindow(){
           -vr
           myRadBtnGrp`;
      radioButtonGrp -numberOfRadioButtons 3 -shareCollection $vertGroup1
-    				-vr -label "" -labelArray3 "selfAlignX" "selfAlignY" "selfAlignZ" radBtnGrp2;
+    				 -vr -label "" -labelArray3 "selfAlignX" "selfAlignY" "selfAlignZ" radBtnGrp2;
      button -label "Align Vertex" -w 100 -command "makeObj()" myBtn1;
      //button -label "Test Button" -w 100 myBtn2;
     
@@ -825,7 +858,25 @@ global proc fuShaderWindow(){
         
     $radioBttnForm;
     
-    separator -st "shelf" -p "Modeling";
+    columnLayout -p "RenamingTools";
+    rowColumnLayout -numberOfRows 2
+    				-ro 1 "bottom" 10
+    				-ro 2 "top" 0
+    				-ro 3 "both" 30
+    				-p "RenamingTools"
+    				-rowHeight 1 30
+        			-rowHeight 2 30
+    				renamerGrpLayout;
+	textFieldGrp -p "renamerGrpLayout" -cw 1 50 -cw 2 150 -label "Rename: " xRename;
+	text -w 50 -l "" -p "renamerGrpLayout";
+	text -w 50 -l "" -p "renamerGrpLayout";
+	button -p "renamerGrpLayout" -w 100 -l "Rename" -c "renameObjects()" renameButton01;
+	separator -st "shelf" -p "RenamingTools";
+	textFieldGrp -p "RenamingTools" -label "Y" -text "0" ycor;
+	textFieldGrp -p "RenamingTools" -label "Z" -text "0" zcor;
+	button -p "RenamingTools" -l "Move Absolute" -c "tam";
+	button -p "RenamingTools" -l "Move Relative" -c "rel";
+    //columnLayout -p "renameRC";
     
     //START ANIMATION TAB
     frameLayout -w 370 -mh 10 -mw 10 -p "topColAlignAnimation" -label " Animation Quick Select " -collapsable false -collapse false quickSelectionAnimationFrameLayout;
@@ -840,3 +891,5 @@ global proc fuShaderWindow(){
     showWindow shaderWindowUI;
 
 }
+
+fuShaderWindow()
