@@ -16,25 +16,109 @@ wrote the display date function
 ----------------------------------------------------------------------------------------
 */
 
-//renaming tools
+/*
+
+Renaming Tool Functions
+
+
+Functions:
+-search and replace
+-prefix
+-suffix
+-rename
+
+
+*/
 global proc searchAndDestroy(){
-	print("search and replaced");
+	
+	string $sel[] = `ls -sl`;
+	string $currentTextSelection[] = `textScrollList -q -ai myScroll`;
+	
+	for ($each in $sel){
+		for ($item in $currentTextSelection){
+			if($item == $each){
+				textScrollList -e -ri $each myScroll;
+			}
+		}
+	}
+	
+	string $queryField1 = `textFieldGrp -q -tx "searchTextFld"`;
+	string $queryField2 = `textFieldGrp -q -tx "replaceTextFld"`;
+	searchReplaceNames $queryField1 $queryField2 "selected";
+	
 }
 
 global proc renameObjects(){
-	print("Not Enabled");
+	string $queryField = `textFieldGrp -q -tx "xRename"`;
+	string $sel[] = `ls -sl`;
+	string $count = `intFieldGrp -q -v1 "xRenameCount"`;
+	
+	string $newName = $queryField + $count;
+	string $currentTextSelection[] = `textScrollList -q -ai myScroll`;
+	for ($each in $sel){
+		for ($item in $currentTextSelection){
+			if($item == $each){
+				textScrollList -e -ri $each myScroll;
+			}
+		}
+	}
+	
+	for ($each in $sel){
+		rename $each $newName;
+	}
 }
 
 global proc addPrefix(){
-	print("Prefix Added");
+	string $queryField = `textFieldGrp -q -tx "prefixTextFld"`;
+	string $sel[] = `ls -sl`;
+	//string $count = `intFieldGrp -q -v1 "xRenameCount"`;
+	
+	string $newName = "";
+	string $currentTextSelection[] = `textScrollList -q -ai myScroll`;
+	for ($each in $sel){
+		for ($item in $currentTextSelection){
+			if($item == $each){
+				textScrollList -e -ri $each myScroll;
+			}
+		}
+	}
+	
+	for ($each in $sel){
+		$newName = $queryField + $each;
+		rename $each $newName;
+	}
 }
 
 global proc addSuffix(){
-	print("suffix Added");
+	string $queryField = `textFieldGrp -q -tx "suffixTextFld"`;
+	string $sel[] = `ls -sl`;
+	//string $count = `intFieldGrp -q -v1 "xRenameCount"`;
+	
+	string $newName = "";
+	string $currentTextSelection[] = `textScrollList -q -ai myScroll`;
+	for ($each in $sel){
+		for ($item in $currentTextSelection){
+			if($item == $each){
+				textScrollList -e -ri $each myScroll;
+			}
+		}
+	}
+	
+	for ($each in $sel){
+		$newName = $each + $queryField;
+		rename $each $newName;
+	}
 }
 
-/**
- * Create a new parent group for selected objects
+/*
+Create a new parent group for selected objects
+
+Functions:
+-groupGrouperOrigin
+-doGroupForOffset
+-unGroupGrouper
+-createGroupGrouper
+
  */
  
  
@@ -88,6 +172,7 @@ global proc groupGrouperOrigin(){
 	} // end if
 	select -r $newSelection;
 } // end proc
+
 
 global proc doGroupForOffset()
 {
@@ -190,6 +275,8 @@ global proc createGroupGrouper()
 
 /*
 Functions System Date on HUD
+-sysDate
+-dateDisplay
 */
 
 global proc string sysDate(){
@@ -222,6 +309,7 @@ headsUpDisplay -rem dateHUD;
 
 /*
 Function For Creating a Different Kind of Rivet
+-createRivet
 */
 
 global proc createRivet(){
@@ -631,6 +719,14 @@ global proc isolateSel()
 global proc doSelection()
 {
     string $items[] = `textScrollList -q -si myScroll`;
+    for ($each in $items){
+		if ( `objExists $each` ) {
+			string $uselessString = "I'm basically Milhouse.";
+		}
+		else{
+			textScrollList -e -ri $each myScroll;
+		}
+	}
     select -r $items;
 }
     
@@ -646,6 +742,7 @@ global proc dwRemoveObjectsFromList ()
             }
 
 }
+
 
 /*
 Main GUI Window
@@ -800,8 +897,8 @@ global proc fuShaderWindow(){
     	-parent "ghostFBXFrameLayout"
 		-horizontalScrollBarThickness 30
 	 	-verticalScrollBarThickness   30
-	 	-height 400
-	 	-bgc .5 .5 .5
+	 	-height 500
+	 	-bgc .3 .3 .3
 	 	ghostLibraryScrollLayout;
 
 	
@@ -867,15 +964,49 @@ global proc fuShaderWindow(){
     				-rowHeight 1 30
         			-rowHeight 2 30
     				renamerGrpLayout;
-	textFieldGrp -p "renamerGrpLayout" -cw 1 50 -cw 2 150 -label "Rename: " xRename;
-	text -w 50 -l "" -p "renamerGrpLayout";
-	text -w 50 -l "" -p "renamerGrpLayout";
-	button -p "renamerGrpLayout" -w 100 -l "Rename" -c "renameObjects()" renameButton01;
-	separator -st "shelf" -p "RenamingTools";
-	textFieldGrp -p "RenamingTools" -label "Y" -text "0" ycor;
-	textFieldGrp -p "RenamingTools" -label "Z" -text "0" zcor;
-	button -p "RenamingTools" -l "Move Absolute" -c "tam";
-	button -p "RenamingTools" -l "Move Relative" -c "rel";
+    
+    textFieldGrp -p "renamerGrpLayout" -cw 1 50 -cw 2 150 -label "Rename: " xRename;
+    
+    intFieldGrp -v1 1 -p "renamerGrpLayout" -cw 1 50 -cw 2 50 -label "Start #:" xRenameCount;
+    button -p "renamerGrpLayout" -w 100 -l "Rename" -c "renameObjects()" renameButton01;
+	
+	
+	text -l "" -p "renamerGrpLayout";
+	
+	separator -st "in" -p "RenamingTools" ;
+    rowColumnLayout -numberOfRows 2
+				-ro 1 "bottom" 10
+				-ro 2 "top" 0
+				-ro 3 "both" 30
+				-p "RenamingTools"
+				-rowHeight 1 30
+    			-rowHeight 2 30
+				fixGrpLayout;
+	
+	textFieldGrp -cw 1 50 -cw 2 150 -p "fixGrpLayout" -label "Prefix" prefixTextFld;
+	textFieldGrp -cw 1 50 -cw 2 150 -p "fixGrpLayout" -label "Suffix"  suffixTextFld;
+	button -w 100 -p "fixGrpLayout" -l "Add Prefix:" -c "addPrefix()";
+	button -w 100 -p "fixGrpLayout" -l "Add Suffix:" -c "addSuffix()";
+	
+	separator -st "in" -p "RenamingTools" ;
+	
+    rowColumnLayout -numberOfRows 2
+			-ro 1 "bottom" 10
+			-ro 2 "top" 0
+			-ro 3 "both" 30
+			-p "RenamingTools"
+			-rowHeight 1 30
+			-rowHeight 2 30
+			searchEtReplaceGrpLayout;
+	
+	
+	
+	textFieldGrp -cw 1 50 -cw 2 150 -p "searchEtReplaceGrpLayout" -label "Search:" searchTextFld;
+	textFieldGrp -cw 1 50 -cw 2 150 -p "searchEtReplaceGrpLayout" -label "Replace:"  replaceTextFld;
+	text -l "" -p "searchEtReplaceGrpLayout";
+	button -w 100 -p "searchEtReplaceGrpLayout" -l "Replace:" -c "searchAndDestroy()";
+	
+	
     //columnLayout -p "renameRC";
     
     //START ANIMATION TAB
@@ -891,5 +1022,3 @@ global proc fuShaderWindow(){
     showWindow shaderWindowUI;
 
 }
-
-fuShaderWindow()
