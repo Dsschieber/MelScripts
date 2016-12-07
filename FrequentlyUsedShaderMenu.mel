@@ -29,6 +29,28 @@ Functions:
 
 
 */
+//round animation keys
+
+global proc fixKeys(){
+	string $animCurves[] = `keyframe -q -name`;
+	
+	for ($animCurve in $animCurves) // browse them
+		{
+		// get all selected keys at this curve
+		float $thisKeys[] = `keyframe -q -sl $animCurve`;
+		if (!size($thisKeys)) // if no keys selected get all keys
+			$thisKeys = `keyframe -q $animCurve`;
+		for ($keys in $thisKeys) // browse the keys
+			{
+			if (`fmod $keys 1` != 0) // if the keys have decimal places move them to the rounded keytime
+			keyframe -e -t $keys -iub true -a -o over -timeChange (floor($keys)) $animCurve;
+		} //end for
+	} //end for
+} //end proc
+
+
+
+//string reconstruction commands
 global proc searchAndDestroy(){
 	
 	string $sel[] = `ls -sl`;
@@ -778,7 +800,7 @@ global proc fuShaderWindow(){
     //FAST SELECTIONS
     frameLayout -w 250 -mh 10 -mw 10 -p "mainLayout02" -label " List Items " -collapsable false -collapse false textScrollLayout;
         columnLayout -adj 1 -p "textScrollLayout";
-            textScrollList -allowMultiSelection true -h 500
+            textScrollList -allowMultiSelection true -h 550
                 -showIndexedItem 4
                 -selectCommand "doSelection"
                 myScroll; 
@@ -807,13 +829,14 @@ global proc fuShaderWindow(){
 						
 					  Animation`;
                       setParent..;
-                      
+    
+    string $child3 = `rowColumnLayout  -p "Rendering"  -numberOfRows 1         
+					  RandomImage`;
     string $child1 = `rowColumnLayout -p "Rendering"  -numberOfColumns 2         
                       Shaders`;
     string $child2 = `rowColumnLayout -p "Rendering"  -numberOfRows 2         
                       Rendering`;
-    string $child3 = `rowColumnLayout  -p "Rendering"  -numberOfRows 1         
-                      helpLineLayout`;
+
                       
 	string $childModeling1 = `rowColumnLayout -p "Modeling"  -numberOfColumns 2 
 							  topColAlign`;
@@ -823,7 +846,8 @@ global proc fuShaderWindow(){
 	
 	string $childAnimation = `rowColumnLayout -p "Animation"  -numberOfRows 2 
 						  	  topColAlignAnimation`;
-     
+
+   
     frameLayout -w 185 -mh 10 -mw 10 -p "Shaders" -label "Frequently Used Shaders " -collapsable false -collapse false oneFrameLayout;
           button -c "importMetal" -p "oneFrameLayout" -label "ImportMetal" -w 50 oneBttn;
           button -c "importFat" -p "oneFrameLayout" -label "ImportFat" -w 50 secondBttn;
@@ -905,11 +929,11 @@ global proc fuShaderWindow(){
 	
 	//START MODELING TAB
 	
-	frameLayout -parent "topColAlign" -width 370 -mh 10 -mw 10 Utilities;
+	frameLayout -cll true -parent "topColAlign" -width 370 -mh 10 -mw 10 Utilities;
 	string $emptyTest02 = `text -l "" -h 10 -p "Modeling"`;
 	separator -st "shelf" -p "Modeling";
 	string $emptyTest03 = `text -l "" -h 10 -p "Modeling"`;
-	frameLayout -parent "Modeling" -width 370 -mh 10 -mw 10 RenamingTools;
+	frameLayout -cll true -parent "Modeling" -width 370 -mh 10 -mw 10 RenamingTools;
 	
 	scrollLayout
     	-parent "Utilities"
@@ -1014,6 +1038,7 @@ global proc fuShaderWindow(){
     
     button -label "Find Controls" -c "controlHunter()";
     button -label "Create Rivet" -c "createRivet()";
+    button -label "Round Keyframes" -c "fixKeys()";
     
     frameLayout -w 185 -mh 10 -mw 10 -p "topColAlignAnimation" -label " Display Options " -collapsable false -collapse false displayOptionsFrameLayout;
     
@@ -1022,3 +1047,4 @@ global proc fuShaderWindow(){
     showWindow shaderWindowUI;
 
 }
+
