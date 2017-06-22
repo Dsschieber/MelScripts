@@ -1,0 +1,28 @@
+proc jointToCv(int $degreeType){
+
+	string $jnt1[] = `ls -sl`; // <-- there are better ways to get the jnt list but this is for the example
+	// normally select by name ^^^
+	
+	// this stores each jnts worldPosition
+	vector $storePositions[];
+	int $x = 0;
+	
+	for ($i = 0; $i < size($jnt1); $i++){
+		$storePositions[$x] = `xform -query -worldSpace -translation $jnt1[$i]`;
+		$x++;
+	}
+	
+	//this creates the curve command 
+	int $degree = $degreeType; //<-- incase u want to change the degree type 
+	
+	string $buildCurve = ("curve -d " + $degree); 
+	
+	for ($each in $storePositions){
+		$buildCurve += (" -p " + $each);
+	}
+	
+	eval $buildCurve;
+	
+}
+
+jointToCv();
